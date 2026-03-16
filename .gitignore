@@ -1,0 +1,24 @@
+# Virtual environment
+venv/
+
+# Dataset (too large for GitHub — download from Kaggle)
+datasets/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment files
+.env
+*.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pandas
+networkx
+plotly
+python-multipart
+jinja2

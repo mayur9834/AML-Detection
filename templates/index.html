@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AML Detection Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet" />
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    :root {
+      --bg:#0f1117; --surface:#1a1d27; --surface2:#242736; --border:#2e3247;
+      --accent:#6366f1; --accent2:#8b5cf6; --danger:#ef4444; --warning:#f59e0b;
+      --success:#10b981; --text:#e2e8f0; --muted:#94a3b8;
+    }
+    * { box-sizing:border-box; }
+    body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; }
+
+    .navbar { background:var(--surface); border-bottom:1px solid var(--border); padding:.9rem 2rem; }
+    .navbar-brand { font-weight:700; font-size:1.2rem; color:var(--text)!important; display:flex; align-items:center; gap:.6rem; }
+    .brand-dot { width:10px; height:10px; background:var(--accent); border-radius:50%; animation:pulse 2s infinite; }
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+    .nav-link-docs { font-size:.82rem; color:var(--accent)!important; text-decoration:none; }
+
+    .main { padding:2rem; max-width:1400px; margin:0 auto; }
+
+    /* Section heading */
+    .sec { font-size:.8rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.1em;
+           display:flex; align-items:center; gap:.6rem; margin-bottom:1rem; }
+    .sec::after { content:''; flex:1; height:1px; background:var(--border); }
+
+    /* Cards */
+    .card-dark { background:var(--surface); border:1px solid var(--border); border-radius:12px; }
+    .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:12px;
+                 padding:1.1rem 1.4rem; display:flex; align-items:flex-start; gap:.9rem;
+                 transition:border-color .2s; }
+    .stat-card:hover { border-color:var(--accent); }
+    .stat-icon { width:40px; height:40px; border-radius:9px; display:flex; align-items:center;
+                 justify-content:center; font-size:1.1rem; flex-shrink:0; }
+    .stat-label { font-size:.72rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
+    .stat-value { font-size:1.75rem; font-weight:700; line-height:1.1; }
+    .stat-sub   { font-size:.78rem; color:var(--muted); margin-top:.2rem; }
+
+    /* Charts */
+    .chart-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:1.25rem; }
+    .chart-title { font-size:.82rem; font-weight:600; color:var(--muted); text-transform:uppercase;
+                   letter-spacing:.06em; margin-bottom:.75rem; }
+
+    /* Tabs */
+    .aml-tabs .nav-link { color:var(--muted); border:none; border-bottom:2px solid transparent;
+                          border-radius:0; padding:.55rem .9rem; font-size:.85rem; transition:all .2s; }
+    .aml-tabs .nav-link:hover { color:var(--text); }
+    .aml-tabs .nav-link.active { color:var(--accent); border-bottom-color:var(--accent); background:none; }
+    .tab-body { background:var(--surface); border:1px solid var(--border); border-top:none;
+                border-radius:0 0 12px 12px; padding:1rem; }
+
+    /* Table */
+    .t { width:100%; border-collapse:collapse; font-size:.84rem; }
+    .t th { background:var(--surface2); color:var(--muted); font-weight:700; text-transform:uppercase;
+            font-size:.7rem; letter-spacing:.07em; padding:.7rem 1rem; border-bottom:1px solid var(--border); }
+    .t td { padding:.6rem 1rem; border-bottom:1px solid var(--border); }
+    .t tr:last-child td { border-bottom:none; }
+    .t tr:hover td { background:var(--surface2); }
+    .mono { font-family:'Consolas',monospace; font-size:.8rem; color:#a5b4fc; }
+    .tscroll { max-height:400px; overflow-y:auto; }
+    .tscroll::-webkit-scrollbar { width:5px; }
+    .tscroll::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+    /* Badges */
+    .bd { padding:.18rem .55rem; border-radius:20px; font-size:.72rem; font-weight:700; display:inline-block; }
+    .bd-red  { background:rgba(239,68,68,.15);  color:#f87171; }
+    .bd-yel  { background:rgba(245,158,11,.15); color:#fbbf24; }
+    .bd-blu  { background:rgba(99,102,241,.15); color:#818cf8; }
+    .bd-grn  { background:rgba(16,185,129,.15); color:#34d399; }
+
+    /* Buttons */
+    .btn-run { background:linear-gradient(135deg,var(--accent),var(--accent2)); border:none; color:#fff;
+               padding:.55rem 1.4rem; border-radius:8px; font-weight:600; font-size:.875rem;
+               cursor:pointer; display:inline-flex; align-items:center; gap:.45rem; transition:opacity .2s; }
+    .btn-run:hover { opacity:.85; }
+    .btn-run:disabled { opacity:.45; cursor:not-allowed; }
+
+    /* Upload zone */
+    .upload-zone { border:2px dashed var(--border); border-radius:12px; padding:2.5rem;
+                   text-align:center; color:var(--muted); cursor:pointer; transition:all .2s; }
+    .upload-zone:hover,.upload-zone.drag { border-color:var(--accent); background:rgba(99,102,241,.06); }
+    .upload-zone i { font-size:2.2rem; display:block; margin-bottom:.6rem; }
+
+    /* Cycle path */
+    .path { display:flex; align-items:center; flex-wrap:wrap; gap:.25rem; }
+    .pnode { background:rgba(99,102,241,.15); color:#a5b4fc; padding:.12rem .45rem;
+             border-radius:4px; font-size:.75rem; font-family:monospace; }
+    .parrow { color:var(--muted); font-size:.8rem; }
+
+    /* Alert */
+    .hint { background:rgba(99,102,241,.1); border:1px solid rgba(99,102,241,.3);
+            color:#a5b4fc; border-radius:8px; padding:.65rem 1rem; font-size:.84rem; }
+
+    /* Spinner */
+    .spin-wrap { display:flex; align-items:center; justify-content:center; gap:.65rem;
+                 padding:2.5rem; color:var(--muted); font-size:.9rem; }
+    .empty { text-align:center; padding:2.5rem; color:var(--muted); }
+    .empty i { font-size:2rem; display:block; margin-bottom:.5rem; opacity:.3; }
+
+    /* Divider between default and upload analysis */
+    .upload-section-divider { border:none; border-top:2px solid var(--accent); opacity:.3; margin:2.5rem 0; }
+
+    /* Upload analysis panel */
+    #upload-panel { display:none; }
+    .upload-panel-header { background:linear-gradient(135deg,rgba(99,102,241,.12),rgba(139,92,246,.12));
+                           border:1px solid rgba(99,102,241,.3); border-radius:12px;
+                           padding:1rem 1.5rem; margin-bottom:1.5rem;
+                           display:flex; align-items:center; justify-content:space-between; }
+    .upload-panel-title { font-size:1rem; font-weight:700; color:var(--accent); display:flex; align-items:center; gap:.5rem; }
+    .btn-close-panel { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.1rem; }
+    .btn-close-panel:hover { color:var(--text); }
+  </style>
+</head>
+<body>
+
+<nav class="navbar d-flex justify-content-between align-items-center">
+  <div class="navbar-brand"><div class="brand-dot"></div>AML Detection Dashboard</div>
+  <div class="d-flex align-items-center gap-3">
+    <span style="font-size:.8rem;color:var(--muted)">IBM HI-Small Dataset</span>
+    <a href="/docs" target="_blank" class="nav-link-docs"><i class="bi bi-box-arrow-up-right me-1"></i>API Docs</a>
+  </div>
+</nav>
+
+<div class="main">
+
+  <!-- ── DEFAULT DATASET VIEW ────────────────────────────────────────────── -->
+
+  <div class="sec mb-3"><i class="bi bi-activity"></i>Overview — Default Dataset</div>
+  <div class="row g-3 mb-4" id="stats-row">
+    <!-- filled by loadStats() -->
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="spin-wrap py-2"><div class="spinner-border spinner-border-sm text-secondary"></div></div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="spin-wrap py-2"><div class="spinner-border spinner-border-sm text-secondary"></div></div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="spin-wrap py-2"><div class="spinner-border spinner-border-sm text-secondary"></div></div></div></div>
+    <div class="col-6 col-md-3"><div class="stat-card"><div class="spin-wrap py-2"><div class="spinner-border spinner-border-sm text-secondary"></div></div></div></div>
+  </div>
+
+  <div class="sec mb-3"><i class="bi bi-bar-chart-line"></i>Distribution — Default Dataset</div>
+  <div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="chart-card h-100"><div class="chart-title">Payment Format</div><div id="ch-format" style="height:260px"></div></div></div>
+    <div class="col-md-4"><div class="chart-card h-100"><div class="chart-title">Amount Distribution</div><div id="ch-amount" style="height:260px"></div></div></div>
+    <div class="col-md-4"><div class="chart-card h-100"><div class="chart-title">Laundering vs Legitimate</div><div id="ch-launder" style="height:260px"></div></div></div>
+  </div>
+
+  <!-- Default AML Detection -->
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <div class="sec mb-0" style="flex:1"><i class="bi bi-shield-exclamation"></i>AML Detection — Default Dataset</div>
+    <button class="btn-run ms-3" id="btn-run" onclick="runDefaultAnalysis()">
+      <i class="bi bi-play-fill"></i>Run Analysis
+    </button>
+  </div>
+  <div class="hint mb-3" id="default-hint">Click <strong>Run Analysis</strong> to execute all AML detectors on the pre-loaded dataset.</div>
+
+  <div id="default-detect-wrap">
+    <ul class="nav aml-tabs border-bottom border-secondary">
+      <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#d-fanout"><i class="bi bi-share"></i> Fan-Out <span class="bd bd-red ms-1" id="d-cnt-fanout">—</span></a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#d-fanin"><i class="bi bi-diagram-3"></i> Fan-In <span class="bd bd-yel ms-1" id="d-cnt-fanin">—</span></a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#d-velocity"><i class="bi bi-lightning"></i> Velocity <span class="bd bd-yel ms-1" id="d-cnt-velocity">—</span></a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#d-circular"><i class="bi bi-arrow-repeat"></i> Circular <span class="bd bd-red ms-1" id="d-cnt-circular">—</span></a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#d-layering"><i class="bi bi-layers"></i> Layering <span class="bd bd-blu ms-1" id="d-cnt-layering">—</span></a></li>
+    </ul>
+    <div class="tab-content tab-body">
+      <div class="tab-pane fade show active" id="d-fanout"><div class="empty"><i class="bi bi-clock-history"></i>Run analysis to see results</div></div>
+      <div class="tab-pane fade" id="d-fanin"><div class="empty"><i class="bi bi-clock-history"></i>Run analysis to see results</div></div>
+      <div class="tab-pane fade" id="d-velocity"><div class="empty"><i class="bi bi-clock-history"></i>Run analysis to see results</div></div>
+      <div class="tab-pane fade" id="d-circular"><div class="empty"><i class="bi bi-clock-history"></i>Run analysis to see results</div></div>
+      <div class="tab-pane fade" id="d-layering"><div class="empty"><i class="bi bi-clock-history"></i>Run analysis to see results</div></div>
+    </div>
+    <div id="default-detect-chart" class="mt-3" style="display:none">
+      <div class="chart-card"><div class="chart-title">Flagged Accounts per Detector</div><div id="ch-detect-default" style="height:240px"></div></div>
+    </div>
+  </div>
+
+  <!-- ── UPLOAD ──────────────────────────────────────────────────────────── -->
+  <hr class="upload-section-divider">
+
+  <div class="sec mb-3"><i class="bi bi-cloud-upload"></i>Upload Your Own CSV</div>
+  <div class="upload-zone" id="upload-zone"
+       onclick="document.getElementById('file-input').click()"
+       ondragover="event.preventDefault();this.classList.add('drag')"
+       ondragleave="this.classList.remove('drag')"
+       ondrop="handleDrop(event)">
+    <i class="bi bi-file-earmark-spreadsheet"></i>
+    <div style="font-weight:600;margin-bottom:.3rem">Drop HI-Small_Trans.csv here or click to browse</div>
+    <div style="font-size:.8rem">IBM AML format · CSV only · Results shown below</div>
+  </div>
+  <input type="file" id="file-input" accept=".csv" style="display:none" onchange="uploadFile(this.files[0])" />
+
+  <!-- ── UPLOADED FILE ANALYSIS PANEL ───────────────────────────────────── -->
+  <div id="upload-panel" class="mt-4">
+
+    <div class="upload-panel-header">
+      <div class="upload-panel-title"><i class="bi bi-file-earmark-check"></i><span id="upload-filename">Uploaded File</span></div>
+      <button class="btn-close-panel" onclick="closeUploadPanel()" title="Clear upload"><i class="bi bi-x-lg"></i></button>
+    </div>
+
+    <!-- Upload stats -->
+    <div class="sec mb-3"><i class="bi bi-activity"></i>Overview — Uploaded File</div>
+    <div class="row g-3 mb-4" id="u-stats-row"></div>
+
+    <!-- Upload charts -->
+    <div class="sec mb-3"><i class="bi bi-bar-chart-line"></i>Distribution — Uploaded File</div>
+    <div class="row g-3 mb-4">
+      <div class="col-md-4"><div class="chart-card h-100"><div class="chart-title">Payment Format</div><div id="u-ch-format" style="height:260px"></div></div></div>
+      <div class="col-md-4"><div class="chart-card h-100"><div class="chart-title">Amount Distribution</div><div id="u-ch-amount" style="height:260px"></div></div></div>
+      <div class="col-md-4"><div class="chart-card h-100"><div class="chart-title">Laundering vs Legitimate</div><div id="u-ch-launder" style="height:260px"></div></div></div>
+    </div>
+
+    <!-- Upload detection tabs -->
+    <div class="sec mb-2"><i class="bi bi-shield-exclamation"></i>AML Detection — Uploaded File</div>
+    <ul class="nav aml-tabs border-bottom border-secondary">
+      <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#u-fanout"><i class="bi bi-share"></i> Fan-Out <span class="bd bd-red ms-1" id="u-cnt-fanout">0</span></a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#u-fanin"><i class="bi bi-diagram-3"></i> Fan-In <span class="bd bd-yel ms-1" id="u-cnt-fanin">0</span></a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#u-velocity"><i class="bi bi-lightning"></i> Velocity <span class="bd bd-yel ms-1" id="u-cnt-velocity">0</span></a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#u-circular"><i class="bi bi-arrow-repeat"></i> Circular <span class="bd bd-red ms-1" id="u-cnt-circular">0</span></a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#u-layering"><i class="bi bi-layers"></i> Layering <span class="bd bd-blu ms-1" id="u-cnt-layering">0</span></a></li>
+    </ul>
+    <div class="tab-content tab-body">
+      <div class="tab-pane fade show active" id="u-fanout"></div>
+      <div class="tab-pane fade" id="u-fanin"></div>
+      <div class="tab-pane fade" id="u-velocity"></div>
+      <div class="tab-pane fade" id="u-circular"></div>
+      <div class="tab-pane fade" id="u-layering"></div>
+    </div>
+
+    <!-- Upload detection summary chart -->
+    <div class="chart-card mt-3">
+      <div class="chart-title">Flagged Accounts per Detector — Uploaded File</div>
+      <div id="u-ch-detect" style="height:240px"></div>
+    </div>
+
+  </div><!-- /upload-panel -->
+
+</div><!-- /main -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ── Plotly shared config ──────────────────────────────────────────────────────
+const PL = {
+  paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)',
+  font:{color:'#94a3b8',family:'Segoe UI,system-ui,sans-serif',size:12},
+  margin:{t:10,b:40,l:40,r:10},
+  colorway:['#6366f1','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899'],
+  xaxis:{gridcolor:'#2e3247',zerolinecolor:'#2e3247'},
+  yaxis:{gridcolor:'#2e3247',zerolinecolor:'#2e3247'},
+  legend:{bgcolor:'rgba(0,0,0,0)'},
+};
+const PC = {displayModeBar:false, responsive:true};
+
+function fmt(n){
+  if(n==null) return '—';
+  if(n>=1e9) return (n/1e9).toFixed(1)+'B';
+  if(n>=1e6) return (n/1e6).toFixed(1)+'M';
+  if(n>=1e3) return (n/1e3).toFixed(1)+'K';
+  return String(n);
+}
+
+// ── Render helpers ────────────────────────────────────────────────────────────
+function renderStatCards(containerId, s) {
+  const cards = [
+    {label:'Transactions', value:fmt(s.transactions), sub:`${fmt(s.unique_senders)} senders · ${fmt(s.unique_receivers)} receivers`, icon:'bi-arrow-left-right', color:'#6366f1', bg:'rgba(99,102,241,.15)'},
+    {label:'Graph',        value:fmt(s.graph_nodes)+' nodes', sub:`${fmt(s.graph_edges)} edges`, icon:'bi-diagram-2', color:'#8b5cf6', bg:'rgba(139,92,246,.15)'},
+    {label:'Total Volume', value:'$'+fmt(s.total_amount), sub:`Avg $${fmt(s.avg_amount)}`, icon:'bi-currency-dollar', color:'#10b981', bg:'rgba(16,185,129,.15)'},
+    {label:'Laundering Rate', value:s.laundering_rate_pct+'%', sub:`${fmt(s.known_laundering_tx)} flagged tx`, icon:'bi-shield-exclamation', color:'#ef4444', bg:'rgba(239,68,68,.15)'},
+  ];
+  document.getElementById(containerId).innerHTML = cards.map(c=>`
+    <div class="col-6 col-md-3">
+      <div class="stat-card h-100">
+        <div class="stat-icon" style="background:${c.bg};color:${c.color}"><i class="bi ${c.icon}"></i></div>
+        <div>
+          <div class="stat-label">${c.label}</div>
+          <div class="stat-value" style="color:${c.color}">${c.value}</div>
+          <div class="stat-sub">${c.sub}</div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderCharts(prefix, s) {
+  // Payment format pie
+  const fmts = s.payment_formats;
+  Plotly.newPlot(prefix+'ch-format', [{
+    type:'pie', labels:Object.keys(fmts), values:Object.values(fmts),
+    hole:.45, textinfo:'percent', hoverinfo:'label+value+percent',
+    marker:{line:{color:'#0f1117',width:2}}
+  }], {...PL, margin:{t:10,b:10,l:10,r:10}, showlegend:true,
+    legend:{orientation:'v',bgcolor:'rgba(0,0,0,0)',font:{size:11}}}, PC);
+
+  // Amount histogram
+  Plotly.newPlot(prefix+'ch-amount', [{
+    type:'bar', x:s.amount_hist.x, y:s.amount_hist.y,
+    marker:{color:'#6366f1',opacity:.85}
+  }], {...PL, xaxis:{...PL.xaxis,tickangle:-35,tickfont:{size:9}}, bargap:.1}, PC);
+
+  // Laundering donut
+  const clean = s.transactions - s.known_laundering_tx;
+  Plotly.newPlot(prefix+'ch-launder', [{
+    type:'pie', labels:['Legitimate','Suspicious'], values:[clean, s.known_laundering_tx],
+    hole:.5, marker:{colors:['#10b981','#ef4444'],line:{color:'#0f1117',width:2}},
+    textinfo:'percent', hoverinfo:'label+value+percent'
+  }], {...PL, margin:{t:10,b:10,l:10,r:10}, showlegend:true,
+    legend:{orientation:'v',bgcolor:'rgba(0,0,0,0)',font:{size:11}}}, PC);
+}
+
+function renderDetectorChart(chartId, d) {
+  const labels = ['Fan-Out','Fan-In','Velocity','Circular','Layering'];
+  const values = [d.fan_out.length, d.fan_in.length, d.velocity.length,
+                  d.circular_transactions.length, d.layering_chains.length];
+  Plotly.newPlot(chartId, [{
+    type:'bar', x:labels, y:values,
+    marker:{color:['#ef4444','#f59e0b','#f59e0b','#ef4444','#6366f1'],opacity:.85},
+    text:values, textposition:'outside', textfont:{color:'#e2e8f0'}
+  }], {...PL, bargap:.3, yaxis:{...PL.yaxis,title:'Flagged count'}}, PC);
+}
+
+// ── Detection tab renderers ───────────────────────────────────────────────────
+function tabFanOut(rows){
+  if(!rows.length) return '<div class="empty"><i class="bi bi-check-circle"></i>No suspicious accounts found</div>';
+  const sorted=[...rows].sort((a,b)=>b.out_degree-a.out_degree);
+  return `<p class="text-muted small mb-2">Accounts sending to many unique receivers — smurfing / dispersal pattern.</p>
+  <div class="tscroll"><table class="t">
+    <thead><tr><th>#</th><th>Account</th><th>Out-Degree</th><th>Risk</th></tr></thead>
+    <tbody>${sorted.map((r,i)=>`<tr>
+      <td class="text-secondary">${i+1}</td>
+      <td class="mono">${r.account}</td>
+      <td><strong style="color:#f87171">${r.out_degree}</strong></td>
+      <td><span class="bd bd-red">HIGH</span></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function tabFanIn(rows){
+  if(!rows.length) return '<div class="empty"><i class="bi bi-check-circle"></i>No suspicious accounts found</div>';
+  const sorted=[...rows].sort((a,b)=>b.in_degree-a.in_degree);
+  return `<p class="text-muted small mb-2">Accounts receiving from many different senders — aggregation pattern.</p>
+  <div class="tscroll"><table class="t">
+    <thead><tr><th>#</th><th>Account</th><th>In-Degree</th><th>Risk</th></tr></thead>
+    <tbody>${sorted.map((r,i)=>`<tr>
+      <td class="text-secondary">${i+1}</td>
+      <td class="mono">${r.account}</td>
+      <td><strong style="color:#fbbf24">${r.in_degree}</strong></td>
+      <td><span class="bd bd-yel">MEDIUM</span></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function tabVelocity(rows){
+  if(!rows.length) return '<div class="empty"><i class="bi bi-check-circle"></i>No high-velocity accounts found</div>';
+  const sorted=[...rows].sort((a,b)=>b.max_tx_per_24h-a.max_tx_per_24h);
+  return `<p class="text-muted small mb-2">Accounts making many transactions within a 24-hour window.</p>
+  <div class="tscroll"><table class="t">
+    <thead><tr><th>#</th><th>Account</th><th>Max TX / 24h</th><th>Risk</th></tr></thead>
+    <tbody>${sorted.map((r,i)=>`<tr>
+      <td class="text-secondary">${i+1}</td>
+      <td class="mono">${r.account}</td>
+      <td><strong style="color:#fbbf24">${r.max_tx_per_24h}</strong></td>
+      <td><span class="bd bd-yel">MEDIUM</span></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function tabCircular(cycles){
+  if(!cycles.length) return '<div class="empty"><i class="bi bi-check-circle"></i>No circular transactions found</div>';
+  return `<p class="text-muted small mb-2">Money flows back to the origin account — round-tripping / cycle pattern.</p>
+  <div class="tscroll"><table class="t">
+    <thead><tr><th>#</th><th>Cycle Length</th><th>Accounts in Cycle</th></tr></thead>
+    <tbody>${cycles.map((c,i)=>`<tr>
+      <td class="text-secondary">${i+1}</td>
+      <td><span class="bd bd-red">${c.length} accounts</span></td>
+      <td><div class="path">${c.map((n,j)=>
+        `<span class="pnode">${n}</span>${j<c.length-1?'<span class="parrow">→</span>':'<span class="parrow">↩</span>'}`
+      ).join('')}</div></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function tabLayering(chains){
+  if(!chains.length) return '<div class="empty"><i class="bi bi-check-circle"></i>No layering chains found</div>';
+  return `<p class="text-muted small mb-2">Long transaction chains passing through intermediaries to obscure the money trail.</p>
+  <div class="tscroll"><table class="t">
+    <thead><tr><th>#</th><th>Hops</th><th>Chain</th></tr></thead>
+    <tbody>${chains.slice(0,100).map((c,i)=>`<tr>
+      <td class="text-secondary">${i+1}</td>
+      <td><span class="bd bd-blu">${c.length-1} hops</span></td>
+      <td><div class="path">${c.map((n,j)=>
+        `<span class="pnode">${n}</span>${j<c.length-1?'<span class="parrow">→</span>':''}`
+      ).join('')}</div></td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function fillDetectTabs(prefix, d) {
+  const pfx = prefix ? prefix+'-' : 'd-';
+  document.getElementById(pfx+'cnt-fanout').textContent   = d.fan_out.length;
+  document.getElementById(pfx+'cnt-fanin').textContent    = d.fan_in.length;
+  document.getElementById(pfx+'cnt-velocity').textContent = d.velocity.length;
+  document.getElementById(pfx+'cnt-circular').textContent = d.circular_transactions.length;
+  document.getElementById(pfx+'cnt-layering').textContent = d.layering_chains.length;
+
+  document.getElementById(pfx+'fanout').innerHTML   = tabFanOut(d.fan_out);
+  document.getElementById(pfx+'fanin').innerHTML    = tabFanIn(d.fan_in);
+  document.getElementById(pfx+'velocity').innerHTML = tabVelocity(d.velocity);
+  document.getElementById(pfx+'circular').innerHTML = tabCircular(d.circular_transactions);
+  document.getElementById(pfx+'layering').innerHTML = tabLayering(d.layering_chains);
+}
+
+// ── Default dataset: load stats on page open ──────────────────────────────────
+async function loadStats() {
+  const res = await fetch('/stats');
+  if(!res.ok){
+    const err = await res.json();
+    document.getElementById('stats-row').innerHTML =
+      `<div class="col-12"><div class="hint" style="border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.08);color:#f87171">
+        <i class="bi bi-exclamation-triangle me-2"></i>${err.detail}</div></div>`;
+    return;
+  }
+  const s = await res.json();
+  renderStatCards('stats-row', s);
+  renderCharts('', s);   // prefix '' → ids: ch-format, ch-amount, ch-launder
+}
+
+// ── Default dataset: run analysis on button click ─────────────────────────────
+async function runDefaultAnalysis() {
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analysing…';
+  document.getElementById('default-hint').style.display = 'none';
+
+  ['d-fanout','d-fanin','d-velocity','d-circular','d-layering'].forEach(id=>{
+    document.getElementById(id).innerHTML =
+      '<div class="spin-wrap"><div class="spinner-border spinner-border-sm text-secondary"></div><span>Running…</span></div>';
+  });
+
+  const res = await fetch('/analyze');
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Re-run';
+
+  if(!res.ok){
+    const err = await res.json();
+    document.getElementById('d-fanout').innerHTML =
+      `<div class="empty"><i class="bi bi-exclamation-circle"></i>${err.detail}</div>`;
+    return;
+  }
+
+  const d = await res.json();
+  fillDetectTabs('d', d);   // prefix 'd' → ids: d-cnt-fanout, d-fanout, etc.
+  document.getElementById('default-detect-chart').style.display = 'block';
+  renderDetectorChart('ch-detect-default', d);
+}
+
+// ── Upload file ───────────────────────────────────────────────────────────────
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if(f) uploadFile(f);
+}
+
+async function uploadFile(file){
+  if(!file) return;
+  const zone = document.getElementById('upload-zone');
+  zone.innerHTML = `<div class="spin-wrap py-2"><div class="spinner-border text-secondary"></div><span>Uploading & analysing ${file.name}…</span></div>`;
+
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch('/upload', {method:'POST', body:form});
+
+  // Reset upload zone
+  zone.innerHTML = `<i class="bi bi-file-earmark-spreadsheet"></i>
+    <div style="font-weight:600;margin-bottom:.3rem">Drop HI-Small_Trans.csv here or click to browse</div>
+    <div style="font-size:.8rem">IBM AML format · CSV only · Results shown below</div>`;
+
+  if(!res.ok){
+    const err = await res.json();
+    alert('Upload failed: ' + err.detail);
+    return;
+  }
+
+  const d = await res.json();
+  const s = d.stats;
+
+  // Show panel
+  document.getElementById('upload-filename').textContent = file.name;
+  document.getElementById('upload-panel').style.display = 'block';
+  document.getElementById('upload-panel').scrollIntoView({behavior:'smooth', block:'start'});
+
+  // Render stats, charts, detections for uploaded file
+  renderStatCards('u-stats-row', s);
+  renderCharts('u-', s);   // prefix 'u-' → ids: u-ch-format, u-ch-amount, u-ch-launder
+  fillDetectTabs('u', d);  // prefix 'u' → ids: u-cnt-fanout, u-fanout, etc.
+  renderDetectorChart('u-ch-detect', d);
+}
+
+function closeUploadPanel(){
+  document.getElementById('upload-panel').style.display = 'none';
+  document.getElementById('file-input').value = '';
+}
+
+// Init
+loadStats();
+</script>
+</body>
+</html>
