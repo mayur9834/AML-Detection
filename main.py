@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from config import STRUCTURING_THRESHOLD, STRUCTURING_MARGIN_PCT
 from data_loader import load_dataset, load_from_bytes
 from graph_builder import build_graph
 from aml_detection import run_all_detectors
@@ -69,6 +70,8 @@ def _build_stats(df, G):
             "x": [str(i) for i in amount_dist["amount"].tolist()],
             "y": amount_dist["count"].tolist(),
         },
+        "structuring_threshold": STRUCTURING_THRESHOLD,
+        "structuring_margin_pct": STRUCTURING_MARGIN_PCT,
     }
 
 
